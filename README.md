@@ -22,21 +22,18 @@ The tool reads a video, tracks people frame by frame, and writes a new video at 
 
 For each frame, YOLO detects people and ByteTrack assigns persistent IDs. The foot point of every track is painted as a filled circle on a per-frame float mask, which is blurred and added to an accumulator that decays a little every frame. The accumulator is min-max normalized, colorized with the JET colormap and blended over the frame.
 
-```
-video frame
-    |
-    v
-YOLO detect (person) --> ByteTrack IDs --> boxes, IDs, conf
-    |                                         |
-    |                     +-------------------+-------------------+
-    |                     v                                       v
-    |           foot point (cx, y2)                    trail (last N points)
-    |                     |                                       |
-    |      circle -> blur -> H = decay*H + mask         draw box/label/trail
-    |                     |                                       |
-    |       normalize 0-255 -> JET -> blend + HUD                 |
-    |                     |                                       |
-    +---------------------+------------> [ tracking | heatmap ] --+--> output video / preview
+```mermaid
+flowchart TD
+    A["Video frame"] --> B["YOLO person detection"]
+    B --> C["ByteTrack IDs<br/>(boxes, IDs, confidence)"]
+    C --> D["Foot point (cx, y2)"]
+    C --> E["Trail: last N points"]
+    D --> F["Circle → Gaussian blur<br/>H = decay · H + mask"]
+    F --> G["Normalize 0–255 → JET<br/>blend + HUD"]
+    E --> H["Draw boxes, labels, trails"]
+    G --> I["Side by side:<br/>tracking | heatmap"]
+    H --> I
+    I --> J["Output video + live preview"]
 ```
 
 Details, formulas and tuning tips: [docs/how-it-works.md](docs/how-it-works.md).
