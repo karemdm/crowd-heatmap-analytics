@@ -21,7 +21,7 @@ The foot point approximates where the person touches the ground. It is used for 
 
 ## 2. Trajectories
 
-`TrajectoryStore` keeps the last `trail` (default 30) foot points for every track ID in a bounded deque. The points are drawn as an open yellow polyline, with the green box and an `ID: n (conf)` label on top.
+`TrajectoryStore` keeps the last `trail` (default 30) foot points for every track ID in a bounded deque. The points are drawn as an open yellow polyline, with the green box and an `ID: n (conf)` label on top. The trail of an ID that has received no point for 300 consecutive frames (`Config.trail_max_age`) is dropped, so memory does not grow with the number of people who have left the scene; ByteTrack does not revive IDs lost for longer than its buffer (30 frames by default), so drawn trails are unaffected.
 
 ## 3. Heatmap accumulation
 
@@ -36,12 +36,14 @@ Per frame `t`:
 H_t = d * H_{t-1} + B_t          (d = 0.995)
 ```
 
+Implementation note: the mask is allocated once and only the bounding box of the circles, grown by `k // 2 + 1` pixels, is drawn, blurred and added. Outside that box the blurred mask is zero, so the result equals the full-frame formula up to float rounding; frames without detections only apply the decay.
+
 Properties of this update:
 
 - An event `n` frames old has weight `d^n`. Half-life: `ln(0.5) / ln(d)`, about 138 frames for `d = 0.995` (about 4.6 s at 30 FPS).
 - A person standing still at one spot drives the value there towards `B / (1 - d)`, i.e. 200x the single-frame value.
 - Circles are drawn (set), not added: two people overlapping in the same frame produce the same mask value as one. Density builds up only across frames.
-- `H_t` is linear in `I`. Since the display uses min-max normalization (below), `I` has no visible effect on the rendered heatmap; it only changes the raw accumulator values.
+- `H_t` is linear in `I`. Since the display uses min-max normalization (below), any positive `I` gives the same rendered heatmap and the same `--save-heatmap` image; it only scales the raw accumulator values. The CLI rejects `I <= 0` (zero would give an empty map, a negative value an inverted one).
 
 ## 4. Visualization
 

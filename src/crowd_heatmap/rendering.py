@@ -46,9 +46,9 @@ def draw_hud(image: np.ndarray, stats: OccupancyStats) -> None:
         image: BGR image to draw on.
         stats: Current occupancy statistics.
     """
-    overlay = image.copy()
-    cv2.rectangle(overlay, (10, 10), (320, 120), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, image, 0.4, 0, image)
+    # Darken only the HUD box (black at 60 %) instead of blending a full-frame copy.
+    box = image[10:121, 10:321]
+    box[:] = cv2.convertScaleAbs(box, alpha=0.4)
     cv2.putText(image, f"Current Occupancy: {stats.current}", (20, 35), FONT, 0.6, WHITE, 2)
     cv2.putText(image, f"Peak Occupancy: {stats.peak}", (20, 65), FONT, 0.6, YELLOW, 2)
     cv2.putText(

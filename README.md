@@ -4,7 +4,6 @@ Person tracking with YOLO + ByteTrack and a decaying spatial occupancy heatmap, 
 
 The tool reads a video, tracks people frame by frame, and writes a new video at twice the input width: the left panel shows bounding boxes, IDs and short trajectories; the right panel shows where people have been standing or walking, as a heatmap that fades over time, plus a small HUD with current occupancy, peak occupancy and the number of distinct track IDs seen.
 
-<!-- add a short demo GIF here -->
 ![demo](docs/assets/demo.gif)
 
 ## Features
@@ -95,7 +94,7 @@ Without `--input`, an open dialog asks for the video and a save dialog proposes 
 | `--imgsz` | `1920` | Inference image size. |
 | `--tracker` | `bytetrack.yaml` | Ultralytics tracker config (`botsort.yaml` also works). |
 | `--decay` | `0.995` | Per-frame multiplicative decay of accumulated heat. |
-| `--intensity` | `3.5` | Value painted inside each foot-point circle (kept from the prototype; min-max normalization makes it visually neutral, see docs). |
+| `--intensity` | `3.5` | Value painted inside each foot-point circle (> 0). Kept from the prototype; it has no visible effect on the video or the saved image, because the display is min-max normalized (see docs). |
 | `--radius` | `18` | Foot-point circle radius in pixels. |
 | `--blur` | `35` | Gaussian kernel size (odd). |
 | `--alpha` | `0.6` | Weight of the original frame in the blend; the colormap gets `1 - alpha`. |
@@ -103,6 +102,8 @@ Without `--input`, an open dialog asks for the video and a save dialog proposes 
 | `--save-heatmap` | off | Save the final accumulated heatmap (JET-colored, no frame underneath) to this image path. |
 | `--no-display` | off | Do not open the preview window. |
 | `--verbose`, `-v` | off | Debug logging. |
+
+Out-of-range values (`--conf`, `--decay` or `--alpha` outside `[0, 1]`, `--intensity <= 0`, `--radius < 0`, `--trail < 1`, `--imgsz < 1`, an even or non-positive `--blur`) are rejected before processing starts.
 
 ## Output
 
@@ -119,10 +120,13 @@ crowd-heatmap-analytics/
   pyproject.toml
   docs/
     how-it-works.md
-    assets/                 # demo GIF goes here
+    assets/demo.gif         # demo animation used above
   weights/
     README.md
     yolo26m.pt              # lighter model (yolo26x.pt is auto-downloaded)
+  results/
+    README.md               # description and source of the example videos
+    *_heatmap.mp4           # example outputs
   src/crowd_heatmap/
     __init__.py
     __main__.py             # python -m crowd_heatmap
@@ -151,7 +155,7 @@ Tests cover the pure-logic modules only and need no third-party packages: `pytes
 - Min-max normalization is per frame: colors are relative to the current maximum, not an absolute density scale, and one very busy spot can wash out the rest.
 - With decay 0.995, heat halves in about 138 frames (around 4.6 s at 30 FPS), so the map shows recent activity, not a whole-video total.
 - Foot point = bottom-center of the box; partially visible people (cut off at the bottom, sitting, occluded legs) are placed inaccurately.
-- Trajectories of IDs that are no longer seen are kept in memory until the end of the run (a few points each).
+- Trails of IDs not seen for 300 consecutive frames (`Config.trail_max_age`, not a CLI option) are dropped from memory. This is well above ByteTrack's default lost-track buffer of 30 frames, so it does not change what is drawn. The set of seen IDs behind "Total Unique People" is kept for the whole run (one integer per ID).
 - Processing is offline and not real-time with the default model and image size on most hardware.
 - No result of this tool has been validated against ground truth; outputs are visual analytics aids, not measurements.
 

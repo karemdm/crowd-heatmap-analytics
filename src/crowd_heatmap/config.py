@@ -23,6 +23,9 @@ class Config:
         alpha: Weight of the original frame in the heatmap blend; the colormap
             gets ``1 - alpha``.
         trail: Number of most recent foot points kept per track for the trail.
+        trail_max_age: Frames a track may go unseen before its trail is
+            dropped from memory. Well above ByteTrack's default lost-track
+            buffer (30 frames), so visible trails are not affected.
         display: Whether to show a live preview window.
         screen_fraction_w: Maximum preview width as a fraction of screen width.
         screen_fraction_h: Maximum preview height as a fraction of screen height.
@@ -42,6 +45,7 @@ class Config:
     blur: int = 35
     alpha: float = 0.6
     trail: int = 30
+    trail_max_age: int = 300
     display: bool = True
     screen_fraction_w: float = 0.90
     screen_fraction_h: float = 0.85

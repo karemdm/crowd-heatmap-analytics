@@ -1,6 +1,7 @@
 """Video processing loop: tracking, heatmap accumulation, rendering and output."""
 
 import logging
+import math
 import os
 from typing import List, Tuple
 
@@ -83,10 +84,20 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
         raise ValueError(f"Unable to open video source: {input_path}")
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    if width <= 0 or height <= 0:
+        cap.release()
+        raise ValueError(f"Could not read frame size of video source: {input_path}")
     fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
-    if fps <= 0:
+    if not math.isfinite(fps) or fps <= 0:
         logger.warning("Source FPS unavailable; using %.0f", FALLBACK_FPS)
         fps = FALLBACK_FPS
+
+    # Load the model before creating the writer, so a bad --model leaves no empty file.
+    try:
+        model = YOLO(cfg.model)
+    except Exception:
+        cap.release()
+        raise
 
     out_dir = os.path.dirname(os.path.abspath(output_path))
     os.makedirs(out_dir, exist_ok=True)
@@ -97,10 +108,9 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
         cap.release()
         raise RuntimeError(f"Failed to open VideoWriter for: {output_path}")
 
-    model = YOLO(cfg.model)
     ratio = _display_ratio(cfg, width * 2, height) if cfg.display else 1.0
     heat = HeatmapAccumulator(width, height, cfg.decay, cfg.intensity, cfg.radius, cfg.blur)
-    trails = TrajectoryStore(cfg.trail)
+    trails = TrajectoryStore(cfg.trail, cfg.trail_max_age)
     stats = OccupancyStats()
     frames = 0
 
@@ -113,6 +123,8 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
             if not ok:
                 logger.info("End of video stream reached.")
                 break
+            if frame.shape[1] != width or frame.shape[0] != height:
+                frame = cv2.resize(frame, (width, height))
             result = model.track(frame, persist=True, tracker=cfg.tracker, conf=cfg.conf,
                                  classes=cfg.classes, imgsz=cfg.imgsz, verbose=False)[0]
             detections = extract_detections(result)
@@ -124,6 +136,7 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
                 foot = ((x1 + x2) // 2, y2)
                 feet.append(foot)
                 draw_track(tracking, (x1, y1, x2, y2), tid, conf, trails.add(tid, foot))
+            trails.end_frame()
             heat.update(feet)
 
             heat_view = heat.blend(frame, cfg.alpha)

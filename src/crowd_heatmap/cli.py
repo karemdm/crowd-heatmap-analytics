@@ -41,7 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--decay", type=float, default=d.decay,
                    help="Per-frame heat decay factor (default: %(default)s).")
     p.add_argument("--intensity", type=float, default=d.intensity,
-                   help="Heat added inside each foot-point circle (default: %(default)s).")
+                   help="Value painted inside each foot-point circle, > 0; no visible effect "
+                   "because the display is min-max normalized (default: %(default)s).")
     p.add_argument("--radius", type=int, default=d.radius,
                    help="Foot-point circle radius in pixels (default: %(default)s).")
     p.add_argument("--blur", type=_odd_positive, default=d.blur,
@@ -73,8 +74,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(levelname)s %(message)s")
 
-    if args.trail < 1:
-        logger.error("--trail must be >= 1")
+    errors = [
+        msg for bad, msg in (
+            (args.trail < 1, "--trail must be >= 1"),
+            (not 0.0 <= args.conf <= 1.0, "--conf must be in [0, 1]"),
+            (args.imgsz < 1, "--imgsz must be >= 1"),
+            (not 0.0 <= args.decay <= 1.0, "--decay must be in [0, 1]"),
+            (args.intensity <= 0, "--intensity must be > 0"),
+            (args.radius < 0, "--radius must be >= 0"),
+            (not 0.0 <= args.alpha <= 1.0, "--alpha must be in [0, 1]"),
+        ) if bad
+    ]
+    if errors:
+        for msg in errors:
+            logger.error("%s", msg)
         return 2
 
     input_path, output_path = args.input, args.output
