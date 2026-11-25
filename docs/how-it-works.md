@@ -84,8 +84,25 @@ so it fits within 90 % of the screen width and 85 % of the screen height and is 
 
 - **Long-term occupancy** (where people spend time over the whole video): raise `--decay` towards `0.999` or higher. With `0.999` the half-life is about 23 s (693 frames at 30 FPS).
 - **Live flow** (where people are right now): lower `--decay` to `0.98`-`0.99`.
-- **High-resolution footage** (4K) or **wide scenes**: scale `--radius` and `--blur` with the image size, e.g. about double for 4K. Keep `--blur` odd.
+- **Other resolutions**: scale `--radius` and `--blur` with the image width (see [Resolution scaling](#resolution-scaling)).
 - **Slow hardware**: use `--model weights/yolo26m.pt` and `--imgsz 1280` or `960`; small, distant people may be lost.
 - **Too many spurious boxes**: raise `--conf` to `0.25`-`0.35`.
 - **Frequent ID switches** (inflating "Total Unique People"): try `--tracker botsort.yaml`, or tune the Ultralytics tracker YAML (e.g. `track_buffer`) by copying it and passing its path to `--tracker`.
 - **Export for reports**: `--save-heatmap path.png` stores the final accumulator colorized at input resolution; combine with a high `--decay` for a whole-video summary.
+
+## Resolution scaling
+
+`--radius` (default 18) and `--blur` (default 35) are measured in pixels and are not scaled automatically. The defaults are tuned for input about 1920 px wide. For a different width `W`, pass values scaled by `W / 1920`:
+
+| Input width | `--radius` | `--blur` (odd) |
+|---|---|---|
+| 1280 | 12 | 23 |
+| 1920 (default) | 18 | 35 |
+| 2560 | 24 | 47 |
+| 3840 (4K) | 36 | 71 |
+
+```bash
+crowd-heatmap -i data/street_4k.mp4 --radius 36 --blur 71
+```
+
+Round `--blur` to the nearest odd integer. The same applies to the HUD text, which is drawn at a fixed pixel size. `--decay` is not affected: it is defined per second of video (see above).
