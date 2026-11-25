@@ -49,7 +49,7 @@ Properties of this update:
 
 ## 4. Visualization
 
-1. **Normalize**: `N_t = 255 * (H_t - min H_t) / (max H_t - min H_t)` (OpenCV `NORM_MINMAX`), cast to `uint8` (truncating, so values stay in 0-255 with no wrap-around). If the accumulator is all zeros, the result is all zeros.
+1. **Normalize**: `N_t = 255 * (H_t - min H_t) / (max H_t - min H_t)` (OpenCV `NORM_MINMAX`), rounded to the nearest integer and saturated to `uint8` (values stay in 0-255, no wrap-around); accumulator values below `1e-20` count as zero. If the accumulator is all zeros, the result is all zeros.
 2. **Colorize**: `C_t = applyColorMap(N_t, COLORMAP_JET)`; blue = little or no recent presence, red = the hottest spot in the current accumulator.
 3. **Blend**: `V_t = alpha * frame + (1 - alpha) * C_t` with `alpha = 0.6`.
 4. **HUD**: a black rectangle blended at 60 % opacity in the top-left corner with three lines: current occupancy (tracks in this frame), peak occupancy (max over all frames so far), total unique people (distinct track IDs so far).
