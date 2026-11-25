@@ -8,7 +8,7 @@ Each frame goes to `YOLO.track(frame, persist=True, tracker="bytetrack.yaml", co
 
 - `classes=[0]` keeps only the COCO `person` class.
 - `persist=True` keeps tracker state between calls, so IDs carry over from frame to frame.
-- ByteTrack associates high-confidence detections first, then tries to match low-confidence ones to existing tracks. Together with the low `conf`, this keeps small, distant or partly occluded people tracked, at the cost of more false positives.
+- ByteTrack associates high-confidence detections first, then tries to match low-confidence ones to existing tracks. With the stock `bytetrack.yaml` (`track_high_thresh: 0.25`, `track_low_thresh: 0.1`, `new_track_thresh: 0.25`) the low `conf` helps keep an already tracked person alive through weak detections, but a new track only starts from a detection scoring at least 0.25.
 - Detections that the tracker has not yet confirmed (no ID) are ignored for that frame.
 
 For every tracked box `(x1, y1, x2, y2)`, the **foot point** is
@@ -40,14 +40,14 @@ Implementation note: the mask is allocated once and only the bounding box of the
 
 Properties of this update:
 
-- An event `n` frames old has weight `d^n`. Half-life: `ln(0.5) / ln(d)`, about 138 frames for `d = 0.995` (about 4.6 s at 30 FPS).
+- An event `n` frames old has weight `d^n`. Half-life: `ln(0.5) / ln(d)`, about 138 frames for `d = 0.995` (about 4.6 s at 30 FPS, 2.3 s at 60 FPS: the decay is per frame, not per second).
 - A person standing still at one spot drives the value there towards `B / (1 - d)`, i.e. 200x the single-frame value.
 - Circles are drawn (set), not added: two people overlapping in the same frame produce the same mask value as one. Density builds up only across frames.
 - `H_t` is linear in `I`. Since the display uses min-max normalization (below), any positive `I` gives the same rendered heatmap and the same `--save-heatmap` image; it only scales the raw accumulator values. The CLI rejects `I <= 0` (zero would give an empty map, a negative value an inverted one).
 
 ## 4. Visualization
 
-1. **Normalize**: `N_t = 255 * (H_t - min H_t) / (max H_t - min H_t)` (OpenCV `NORM_MINMAX`), cast to `uint8`. If the accumulator is all zeros, the result is all zeros.
+1. **Normalize**: `N_t = 255 * (H_t - min H_t) / (max H_t - min H_t)` (OpenCV `NORM_MINMAX`), cast to `uint8` (truncating, so values stay in 0-255 with no wrap-around). If the accumulator is all zeros, the result is all zeros.
 2. **Colorize**: `C_t = applyColorMap(N_t, COLORMAP_JET)`; blue = little or no recent presence, red = the hottest spot in the current accumulator.
 3. **Blend**: `V_t = alpha * frame + (1 - alpha) * C_t` with `alpha = 0.6`.
 4. **HUD**: a black rectangle blended at 60 % opacity in the top-left corner with three lines: current occupancy (tracks in this frame), peak occupancy (max over all frames so far), total unique people (distinct track IDs so far).
