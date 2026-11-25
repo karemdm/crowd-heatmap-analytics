@@ -71,3 +71,12 @@ def test_invalid_max_age():
     except ValueError:
         return
     raise AssertionError("expected ValueError")
+
+
+def test_pruned_track_can_return_with_a_fresh_trail():
+    store = TrajectoryStore(max_length=5, max_age=1)
+    store.add(1, (0, 0))
+    store.end_frame()
+    store.end_frame()
+    assert store.get(1) == []
+    assert store.add(1, (5, 5)) == [(5, 5)]

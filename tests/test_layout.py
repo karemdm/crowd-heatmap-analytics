@@ -33,3 +33,7 @@ def test_invalid_frame_size():
 def test_scaled_size():
     assert scaled_size(3840, 1080, 0.45) == (1728, 486)
     assert scaled_size(10, 10, 0.0) == (1, 1)
+
+
+def test_degenerate_screen_gives_zero_ratio():
+    assert fit_scale(100, 100, 0, 0) == 0.0
