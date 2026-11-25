@@ -33,14 +33,16 @@ Per frame `t`:
 4. Accumulate with exponential decay:
 
 ```
-H_t = d * H_{t-1} + B_t          (d = 0.995)
+H_t = d_f * H_{t-1} + B_t        d_f = d ** (30 / fps),  d = 0.995 at 30 FPS
 ```
+
+`--decay` is the per-frame factor at a 30 FPS reference. The factor actually applied per processed frame is `d_f = d ** (30 / fps)`, with `fps` the real processing rate of the video, so the memory is defined in seconds and does not change with the frame rate. At 30 FPS `d_f = d`.
 
 Implementation note: the mask is allocated once and only the bounding box of the circles, grown by `k // 2 + 1` pixels, is drawn, blurred and added. Outside that box the blurred mask is zero, so the result equals the full-frame formula up to float rounding; frames without detections only apply the decay.
 
 Properties of this update:
 
-- An event `n` frames old has weight `d^n`. Half-life: `ln(0.5) / ln(d)`, about 138 frames for `d = 0.995` (about 4.6 s at 30 FPS, 2.3 s at 60 FPS: the decay is per frame, not per second).
+- An event `n` frames old has weight `d_f^n`. Half-life in seconds: `ln(0.5) / ln(d) / 30`, about 4.6 s for `d = 0.995` at any frame rate (138 frames at 30 FPS, 69 at 15 FPS, 276 at 60 FPS).
 - A person standing still at one spot drives the value there towards `B / (1 - d)`, i.e. 200x the single-frame value.
 - Circles are drawn (set), not added: two people overlapping in the same frame produce the same mask value as one. Density builds up only across frames.
 - `H_t` is linear in `I`. Since the display uses min-max normalization (below), any positive `I` gives the same rendered heatmap and the same `--save-heatmap` image; it only scales the raw accumulator values. The CLI rejects `I <= 0` (zero would give an empty map, a negative value an inverted one).
@@ -80,7 +82,7 @@ so it fits within 90 % of the screen width and 85 % of the screen height and is 
 
 ## Tuning tips
 
-- **Long-term occupancy** (where people spend time over the whole video): raise `--decay` towards `0.999` or higher. With `0.999` the half-life is about 693 frames.
+- **Long-term occupancy** (where people spend time over the whole video): raise `--decay` towards `0.999` or higher. With `0.999` the half-life is about 23 s (693 frames at 30 FPS).
 - **Live flow** (where people are right now): lower `--decay` to `0.98`-`0.99`.
 - **High-resolution footage** (4K) or **wide scenes**: scale `--radius` and `--blur` with the image size, e.g. about double for 4K. Keep `--blur` odd.
 - **Slow hardware**: use `--model weights/yolo26m.pt` and `--imgsz 1280` or `960`; small, distant people may be lost.

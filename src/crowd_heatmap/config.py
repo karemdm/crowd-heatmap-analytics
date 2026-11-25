@@ -16,7 +16,9 @@ class Config:
         imgsz: Inference image size; high values preserve small people.
         tracker: Ultralytics tracker configuration file.
         classes: COCO class IDs to track (0 = person).
-        decay: Per-frame multiplicative decay of the accumulated heat.
+        decay: Per-frame decay of the accumulated heat at 30 FPS; at another
+            frame rate the factor is ``decay ** (30 / fps)`` (same half-life in
+            seconds).
         intensity: Value painted inside each foot-point circle on the frame mask.
         radius: Radius in pixels of the foot-point circle.
         blur: Gaussian blur kernel size (odd, square) applied to the frame mask.

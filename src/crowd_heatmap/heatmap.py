@@ -8,13 +8,38 @@ import numpy as np
 
 Point = Tuple[int, int]
 
+REFERENCE_FPS = 30.0
+"""Frame rate at which ``decay`` is defined as a per-frame factor."""
+
+
+def effective_decay(decay: float, fps: float = REFERENCE_FPS) -> float:
+    """Converts the reference per-frame decay into the per-frame factor at ``fps``.
+
+    ``decay`` is the per-frame factor at :data:`REFERENCE_FPS` (30 FPS), so the
+    half-life in seconds is the same for every frame rate: ``decay ** (30 / fps)``.
+
+    Args:
+        decay: Per-frame decay at the reference frame rate, in ``[0, 1]``.
+        fps: Real processing rate in frames per second (> 0).
+
+    Returns:
+        The multiplicative decay to apply on each processed frame.
+
+    Raises:
+        ValueError: If ``fps`` is not a positive finite number.
+    """
+    if not math.isfinite(fps) or fps <= 0:
+        raise ValueError("fps must be a positive finite number")
+    return decay ** (REFERENCE_FPS / fps)
+
 
 class HeatmapAccumulator:
     """Accumulates blurred foot-point heat over time with exponential decay.
 
     For each frame a float mask is filled with circles of value ``intensity``
     at the foot points, blurred with a square Gaussian kernel, and added to the
-    decayed accumulator: ``H_t = decay * H_{t-1} + blur(M_t)``.
+    decayed accumulator: ``H_t = frame_decay * H_{t-1} + blur(M_t)``, where
+    ``frame_decay = decay ** (30 / fps)``.
 
     The mask buffer is allocated once and reused. Only the region that can be
     non-zero after blurring (the bounding box of the circles, grown by half the
@@ -25,15 +50,19 @@ class HeatmapAccumulator:
     Args:
         width: Frame width in pixels.
         height: Frame height in pixels.
-        decay: Multiplicative decay applied each frame.
+        decay: Per-frame decay factor at 30 FPS (reference). At another frame
+            rate the per-frame factor is ``decay ** (30 / fps)``, so the half-life
+            in seconds does not depend on the FPS.
         intensity: Value painted inside each circle.
         radius: Circle radius in pixels.
         blur: Gaussian kernel size (odd, positive).
+        fps: Real processing rate in frames per second (> 0).
 
     Raises:
         ValueError: If the frame size is not positive, ``decay`` is outside
             ``[0, 1]``, ``radius`` is negative, ``intensity`` is not finite, or
-            ``blur`` is not a positive odd integer.
+            ``blur`` is not a positive odd integer, or ``fps`` is not a
+            positive finite number.
     """
 
     def __init__(
@@ -44,6 +73,7 @@ class HeatmapAccumulator:
         intensity: float = 3.5,
         radius: int = 18,
         blur: int = 35,
+        fps: float = REFERENCE_FPS,
     ) -> None:
         """Allocates a zeroed accumulator and a reusable mask buffer."""
         if width < 1 or height < 1:
@@ -57,6 +87,7 @@ class HeatmapAccumulator:
         if blur < 1 or blur % 2 == 0:
             raise ValueError("blur kernel size must be a positive odd integer")
         self.decay = decay
+        self.frame_decay = effective_decay(decay, fps)
         self.intensity = intensity
         self.radius = radius
         self.blur = blur
@@ -70,7 +101,7 @@ class HeatmapAccumulator:
             points: ``(x, y)`` foot points detected in the frame. May be empty;
                 the accumulator still decays.
         """
-        self.accumulated *= self.decay
+        self.accumulated *= self.frame_decay
         pts = [(int(x), int(y)) for x, y in points]
         if not pts:
             return

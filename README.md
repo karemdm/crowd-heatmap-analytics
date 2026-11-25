@@ -96,7 +96,7 @@ Without `--input`, an open dialog asks for the video and a save dialog proposes 
 | `--conf` | `0.10` | Detection confidence threshold (low, to keep small or distant people). |
 | `--imgsz` | `1920` | Inference image size. |
 | `--tracker` | `bytetrack.yaml` | Ultralytics tracker config (`botsort.yaml` also works). |
-| `--decay` | `0.995` | Per-frame multiplicative decay of accumulated heat. |
+| `--decay` | `0.995` | Decay of accumulated heat per frame at 30 FPS (reference). At another FPS the per-frame factor is `decay ** (30 / fps)`, so the half-life in seconds is the same: `0.995` halves in about 4.6 s. |
 | `--intensity` | `3.5` | Value painted inside each foot-point circle (> 0). Kept from the prototype; it has no visible effect on the video or the saved image, because the display is min-max normalized (see docs). |
 | `--radius` | `18` | Foot-point circle radius in pixels. |
 | `--blur` | `35` | Gaussian kernel size (odd). |
@@ -158,9 +158,9 @@ Tests use synthetic data only (no model, no video): `pip install pytest` and run
 - Current and peak occupancy count only tracked detections in the frame; missed or occluded people are not counted, and false positives (a low `--conf` of 0.10 raises their likelihood) are.
 - The heatmap is in image coordinates. There is no perspective correction, so people near the camera cover more pixels than distant ones, and the heat is not comparable across camera views.
 - Min-max normalization is per frame: colors are relative to the current maximum, not an absolute density scale, and one very busy spot can wash out the rest.
-- With decay 0.995, heat halves in about 138 frames (around 4.6 s at 30 FPS), so the map shows recent activity, not a whole-video total.
+- With decay 0.995, heat halves in about 4.6 s (138 frames at 30 FPS; the decay is rescaled to the video FPS), so the map shows recent activity, not a whole-video total.
 - `--conf` only lowers the threshold for matching existing tracks. With the stock ByteTrack settings (`new_track_thresh: 0.25`) a person never seen above 0.25 does not start a track, so it appears in neither the heatmap nor the counts.
-- Decay is per processed frame, not per second: the half-life in seconds depends on the video FPS (about 4.6 s only at 30 FPS). `--blur`, `--radius` and the HUD font are in pixels and do not scale with the resolution.
+- `--decay` is defined at 30 FPS and rescaled to the video FPS, so the half-life in seconds is the same at any frame rate. `--blur`, `--radius` and the HUD font are in pixels and do not scale with the resolution.
 - Foot point = bottom-center of the box; partially visible people (cut off at the bottom, sitting, occluded legs) are placed inaccurately.
 - Trails of IDs not seen for 300 consecutive frames (`Config.trail_max_age`, not a CLI option) are dropped from memory. This is well above ByteTrack's default lost-track buffer of 30 frames, so it does not change what is drawn. The set of seen IDs behind "Total Unique People" is kept for the whole run (one integer per ID).
 - Processing is offline and not real-time with the default model and image size on most hardware.

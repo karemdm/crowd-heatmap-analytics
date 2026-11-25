@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from crowd_heatmap.heatmap import HeatmapAccumulator
+from crowd_heatmap.heatmap import HeatmapAccumulator, effective_decay
 
 
 def _reference(width, height, steps, decay, intensity, radius, blur):
@@ -114,3 +114,43 @@ def test_invalid_arguments(kwargs):
     args = {"width": 10, "height": 10, **kwargs}
     with pytest.raises(ValueError):
         HeatmapAccumulator(**args)
+
+
+def _half_life_seconds(decay, fps):
+    """Seconds until a single event decays to half its weight."""
+    heat = HeatmapAccumulator(10, 10, decay=decay, radius=1, blur=3, fps=fps)
+    heat.update([(5, 5)])
+    start = float(heat.accumulated.max())
+    frames = 0
+    while heat.accumulated.max() > start / 2:
+        heat.update([])
+        frames += 1
+    return frames / fps
+
+
+@pytest.mark.parametrize("fps", [15.0, 60.0])
+def test_half_life_in_seconds_is_independent_of_fps(fps):
+    assert _half_life_seconds(0.995, fps) == pytest.approx(_half_life_seconds(0.995, 30.0), abs=1 / 15)
+
+
+def test_30_fps_decay_is_unchanged():
+    assert effective_decay(0.995, 30.0) == 0.995
+    heat = HeatmapAccumulator(40, 30, decay=0.9, radius=3, blur=5)
+    default = HeatmapAccumulator(40, 30, decay=0.9, radius=3, blur=5, fps=30.0)
+    for h in (heat, default):
+        h.update([(20, 15)])
+        h.update([])
+    assert np.array_equal(heat.accumulated, default.accumulated)
+    assert heat.frame_decay == 0.9
+
+
+def test_effective_decay_at_15_fps_is_two_30_fps_steps():
+    assert effective_decay(0.8, 15.0) == pytest.approx(0.64)
+
+
+@pytest.mark.parametrize("fps", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_fps_is_rejected(fps):
+    with pytest.raises(ValueError):
+        effective_decay(0.9, fps)
+    with pytest.raises(ValueError):
+        HeatmapAccumulator(10, 10, fps=fps)
