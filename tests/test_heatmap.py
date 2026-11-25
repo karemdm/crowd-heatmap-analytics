@@ -154,3 +154,16 @@ def test_invalid_fps_is_rejected(fps):
         effective_decay(0.9, fps)
     with pytest.raises(ValueError):
         HeatmapAccumulator(10, 10, fps=fps)
+
+
+def test_normalized_rounds_instead_of_truncating():
+    heat = HeatmapAccumulator(3, 1)
+    heat.accumulated[:] = [[0.0, 0.5, 1.0]]
+    assert heat.normalized().tolist() == [[0, 128, 255]]  # 127.5 rounds up
+
+
+def test_normalized_treats_tiny_values_as_zero():
+    heat = HeatmapAccumulator(3, 1)
+    heat.accumulated[:] = [[1e-42, 1e-25, 1.0]]  # 1e-42 is a float32 denormal
+    assert heat.normalized().tolist() == [[0, 0, 255]]
+    assert heat.accumulated[0, 1] == np.float32(1e-25)  # the accumulator is not modified

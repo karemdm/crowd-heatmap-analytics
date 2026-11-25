@@ -8,6 +8,9 @@ import numpy as np
 
 Point = Tuple[int, int]
 
+TINY = 1e-20
+"""Accumulator values below this are treated as zero (avoids float denormals)."""
+
 REFERENCE_FPS = 30.0
 """Frame rate at which ``decay`` is defined as a per-frame factor."""
 
@@ -122,9 +125,14 @@ class HeatmapAccumulator:
         mask.fill(0.0)
 
     def normalized(self) -> np.ndarray:
-        """Returns the accumulator min-max normalized to ``uint8`` 0-255."""
-        norm = cv2.normalize(self.accumulated, None, 0, 255, cv2.NORM_MINMAX)
-        return norm.astype(np.uint8)
+        """Returns the accumulator min-max normalized to ``uint8`` 0-255.
+
+        Values below ``1e-20`` (left over by the decay) are treated as zero, so
+        denormal floats do not skew the minimum, and the result is rounded to the
+        nearest integer instead of truncated.
+        """
+        acc = np.where(self.accumulated < TINY, np.float32(0.0), self.accumulated)
+        return cv2.normalize(acc, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
     def colorized(self) -> np.ndarray:
         """Returns the normalized accumulator with the JET colormap (BGR)."""
