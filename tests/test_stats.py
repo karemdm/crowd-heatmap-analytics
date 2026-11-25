@@ -32,3 +32,10 @@ def test_accepts_generators():
     stats.update(i for i in range(4))
     assert stats.current == 4
     assert stats.unique_count == 4
+
+
+def test_duplicate_ids_in_one_frame_count_per_detection():
+    stats = OccupancyStats()
+    stats.update([1, 1])
+    assert stats.current == 2
+    assert stats.unique_count == 1

@@ -25,12 +25,15 @@ For each frame, YOLO detects people and ByteTrack assigns persistent IDs. The fo
 flowchart TD
     A["Video frame"] --> B["YOLO person detection"]
     B --> C["ByteTrack IDs<br/>(boxes, IDs, confidence)"]
-    C --> D["Foot point (cx, y2)"]
+    C --> S["Occupancy stats<br/>current, peak, unique IDs"]
+    C --> D["Foot point (cx, y2)<br/>from the xyxy box"]
     C --> E["Trail: last N points"]
     D --> F["Circle → Gaussian blur<br/>H = decay · H + mask"]
-    F --> G["Normalize 0–255 → JET<br/>blend + HUD"]
+    F --> G["Min-max normalize 0–255 → JET<br/>blend with frame"]
+    G --> G2["Draw HUD"]
+    S --> G2
     E --> H["Draw boxes, labels, trails"]
-    G --> I["Side by side:<br/>tracking | heatmap"]
+    G2 --> I["Side by side:<br/>tracking | heatmap"]
     H --> I
     I --> J["Output video + live preview"]
 ```
@@ -103,11 +106,13 @@ Without `--input`, an open dialog asks for the video and a save dialog proposes 
 | `--no-display` | off | Do not open the preview window. |
 | `--verbose`, `-v` | off | Debug logging. |
 
-Out-of-range values (`--conf`, `--decay` or `--alpha` outside `[0, 1]`, `--intensity <= 0`, `--radius < 0`, `--trail < 1`, `--imgsz < 1`, an even or non-positive `--blur`) are rejected before processing starts.
+The output video and the `--save-heatmap` image must not be the input file (or each other); such a call is refused before anything is written. The exit code is 0 on success, 1 for runtime errors (unreadable input, no frames processed, bad output) and 2 for invalid arguments.
+
+Out-of-range values (`--conf`, `--decay` or `--alpha` outside `[0, 1]`, `--intensity` not a finite number `> 0`, `--radius < 0`, `--trail < 1`, `--imgsz < 1`, an even or non-positive `--blur`) are rejected before processing starts.
 
 ## Output
 
-- **Video**: same FPS and height as the input, width x2, `mp4v` codec. Left panel "ORIGINAL TRACKING": green boxes, `ID: n (conf)` labels, yellow trails. Right panel "SPATIAL HEATMAP": colorized heatmap blended over the frame and the HUD (Current Occupancy, Peak Occupancy, Total Unique People). Frames are written continuously, so an early stop with `Q` or Ctrl+C leaves a valid partial video.
+- **Video**: same FPS and height as the input (30 FPS if the file carries no FPS metadata), width x2, `mp4v` codec. Left panel "ORIGINAL TRACKING": green boxes, `ID: n (conf)` labels, yellow trails. Right panel "SPATIAL HEATMAP": colorized heatmap blended over the frame and the HUD (Current Occupancy, Peak Occupancy, Total Unique People). Frames are written continuously, so an early stop with `Q` or Ctrl+C leaves a valid partial video.
 - **Preview window** (unless `--no-display`): the same frame, downscaled to fit within 90 % of the screen width and 85 % of the screen height; never upscaled.
 - **Heatmap image** (only with `--save-heatmap`): the accumulator at the last processed frame, min-max normalized and JET-colorized, at the input resolution. Because of the decay, it reflects recent activity more than early activity.
 
@@ -135,17 +140,17 @@ crowd-heatmap-analytics/
     dialogs.py              # Tkinter file dialogs, screen size
     pipeline.py             # video loop: track -> heat -> render -> write
     heatmap.py              # HeatmapAccumulator (numpy/OpenCV)
+    paths.py                # refuses outputs that would overwrite the input (stdlib)
     rendering.py            # boxes, trails, HUD, titles, side-by-side, resize
     layout.py               # fit-to-screen scale ratio (stdlib)
     stats.py                # OccupancyStats (stdlib)
     trajectories.py         # TrajectoryStore (stdlib)
   tests/
-    test_layout.py
-    test_stats.py
-    test_trajectories.py
+    test_cli.py  test_heatmap.py  test_layout.py  test_paths.py
+    test_pipeline_helpers.py  test_rendering.py  test_stats.py  test_trajectories.py
 ```
 
-Tests cover the pure-logic modules only and need no third-party packages: `pytest` (or run the test functions directly with `src` on `sys.path`).
+Tests use synthetic data only (no model, no video): `pip install pytest` and run `pytest` from the repository root (`pyproject.toml` puts `src` on the path). The tracking loop itself (`process_video`) is not covered by automated tests.
 
 ## Limitations
 
@@ -154,6 +159,8 @@ Tests cover the pure-logic modules only and need no third-party packages: `pytes
 - The heatmap is in image coordinates. There is no perspective correction, so people near the camera cover more pixels than distant ones, and the heat is not comparable across camera views.
 - Min-max normalization is per frame: colors are relative to the current maximum, not an absolute density scale, and one very busy spot can wash out the rest.
 - With decay 0.995, heat halves in about 138 frames (around 4.6 s at 30 FPS), so the map shows recent activity, not a whole-video total.
+- `--conf` only lowers the threshold for matching existing tracks. With the stock ByteTrack settings (`new_track_thresh: 0.25`) a person never seen above 0.25 does not start a track, so it appears in neither the heatmap nor the counts.
+- Decay is per processed frame, not per second: the half-life in seconds depends on the video FPS (about 4.6 s only at 30 FPS). `--blur`, `--radius` and the HUD font are in pixels and do not scale with the resolution.
 - Foot point = bottom-center of the box; partially visible people (cut off at the bottom, sitting, occluded legs) are placed inaccurately.
 - Trails of IDs not seen for 300 consecutive frames (`Config.trail_max_age`, not a CLI option) are dropped from memory. This is well above ByteTrack's default lost-track buffer of 30 frames, so it does not change what is drawn. The set of seen IDs behind "Total Unique People" is kept for the whole run (one integer per ID).
 - Processing is offline and not real-time with the default model and image size on most hardware.
