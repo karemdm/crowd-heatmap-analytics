@@ -136,7 +136,7 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
         raise RuntimeError(f"Failed to open VideoWriter for: {output_path}")
 
     ratio = _display_ratio(cfg, width * 2, height) if cfg.display else 1.0
-    heat = HeatmapAccumulator(width, height, cfg.decay, cfg.intensity, cfg.radius, cfg.blur)
+    heat = HeatmapAccumulator(width, height, cfg.decay, cfg.intensity, cfg.radius, cfg.blur, fps)
     trails = TrajectoryStore(cfg.trail, cfg.trail_max_age)
     stats = OccupancyStats()
     frames = 0

@@ -40,7 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tracker", default=d.tracker,
                    help="Ultralytics tracker config (default: %(default)s).")
     p.add_argument("--decay", type=float, default=d.decay,
-                   help="Per-frame heat decay factor (default: %(default)s).")
+                   help="Heat decay per frame at 30 FPS; scaled to the video FPS as "
+                   "decay**(30/fps), so the half-life is the same in seconds "
+                   "(0.995 = about 4.6 s) (default: %(default)s).")
     p.add_argument("--intensity", type=float, default=d.intensity,
                    help="Value painted inside each foot-point circle, > 0; no visible effect "
                    "because the display is min-max normalized (default: %(default)s).")
