@@ -6,6 +6,8 @@ The tool reads a video, tracks people frame by frame, and writes a new video at 
 
 ![demo](docs/assets/demo.gif)
 
+The demo animation is made from this tool's own output; the source footage is the same kind of public recording used for the results (see [results/README.md](results/README.md)).
+
 ## Features
 
 - Person detection and multi-object tracking (Ultralytics YOLO, ByteTrack by default).
@@ -42,20 +44,46 @@ Details, formulas and tuning tips: [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Installation
 
+Linux / macOS (bash):
+
 ```bash
-git clone <repo-url> crowd-heatmap-analytics
+git clone https://github.com/karemdm/crowd-heatmap-analytics.git
 cd crowd-heatmap-analytics
-python -m venv .venv
-# Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .            # optional: installs the `crowd-heatmap` command
 ```
+
+Windows (PowerShell):
+
+```powershell
+git clone https://github.com/karemdm/crowd-heatmap-analytics.git
+cd crowd-heatmap-analytics
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+pip install -e .            # optional: installs the `crowd-heatmap` command
+```
+
+Windows (cmd):
+
+```bat
+git clone https://github.com/karemdm/crowd-heatmap-analytics.git
+cd crowd-heatmap-analytics
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+pip install -e .
+```
+
+If PowerShell refuses to run the activation script, allow it for the current session with `Set-ExecutionPolicy -Scope Process RemoteSigned`.
 
 Requires Python 3.9+. A CUDA GPU is strongly recommended: the default model (`yolo26x.pt`) at `imgsz 1920` is slow on CPU. For GPU inference, install a CUDA build of PyTorch first, following the instructions on pytorch.org, then install the requirements. Tkinter (bundled with most Python installers) is needed only for the file dialogs and screen-size detection.
 
 ## Results
 
-Example outputs produced by this project (re-encoded to H.264, max 1920 px wide, no audio):
+Example outputs produced by this project (re-encoded to H.264, 1920 px wide, 15 FPS, no audio):
 
 | File | Content |
 |---|---|
@@ -70,6 +98,9 @@ Source footage and attribution: see [results/README.md](results/README.md).
 ```bash
 # Interactive: choose input and output with file dialogs
 crowd-heatmap
+
+# Try it on the bundled sample clip (see samples/README.md)
+crowd-heatmap -i samples/abbey_road_20s.mp4 -o outputs/abbey_road_proc.mp4 --no-display
 
 # Scripted
 crowd-heatmap --input data/mall.mp4 --output outputs/mall_proc.mp4
@@ -105,6 +136,7 @@ Without `--input`, an open dialog asks for the video and a save dialog proposes 
 | `--save-heatmap` | off | Save the final accumulated heatmap (JET-colored, no frame underneath) to this image path. |
 | `--no-display` | off | Do not open the preview window. |
 | `--verbose`, `-v` | off | Debug logging. |
+| `--version` | | Print the version and exit. |
 
 The output video and the `--save-heatmap` image must not be the input file (or each other); such a call is refused before anything is written. The exit code is 0 on success, 1 for runtime errors (unreadable input, no frames processed, bad output) and 2 for invalid arguments.
 
@@ -121,11 +153,16 @@ Out-of-range values (`--conf`, `--decay` or `--alpha` outside `[0, 1]`, `--inten
 ```
 crowd-heatmap-analytics/
   README.md
+  LICENSE
+  .gitignore
   requirements.txt
   pyproject.toml
   docs/
     how-it-works.md
     assets/demo.gif         # demo animation used above
+  samples/
+    README.md               # source of the sample clip
+    abbey_road_20s.mp4      # short input clip to try the tool
   weights/
     README.md
     yolo26m.pt              # lighter model (yolo26x.pt is auto-downloaded)
