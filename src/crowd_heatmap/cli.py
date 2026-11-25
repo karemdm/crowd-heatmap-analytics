@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import math
 from typing import List, Optional
 
 from crowd_heatmap import __version__
@@ -80,7 +81,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             (not 0.0 <= args.conf <= 1.0, "--conf must be in [0, 1]"),
             (args.imgsz < 1, "--imgsz must be >= 1"),
             (not 0.0 <= args.decay <= 1.0, "--decay must be in [0, 1]"),
-            (args.intensity <= 0, "--intensity must be > 0"),
+            (not math.isfinite(args.intensity) or args.intensity <= 0,
+             "--intensity must be a finite number > 0"),
             (args.radius < 0, "--radius must be >= 0"),
             (not 0.0 <= args.alpha <= 1.0, "--alpha must be in [0, 1]"),
         ) if bad
@@ -111,9 +113,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     from crowd_heatmap.pipeline import process_video
 
     try:
-        process_video(input_path, output_path, cfg)
+        frames = process_video(input_path, output_path, cfg)
     except (ValueError, RuntimeError) as exc:
         logger.error("%s", exc)
+        return 1
+    if frames == 0:
+        logger.error("The input video produced no frames.")
         return 1
     return 0
 

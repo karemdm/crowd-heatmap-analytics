@@ -11,6 +11,7 @@ from crowd_heatmap.config import Config
 from crowd_heatmap.dialogs import get_screen_resolution
 from crowd_heatmap.heatmap import HeatmapAccumulator
 from crowd_heatmap.layout import fit_scale
+from crowd_heatmap.paths import check_distinct_paths
 from crowd_heatmap.rendering import (
     draw_hud,
     draw_titles,
@@ -58,6 +59,30 @@ def _display_ratio(cfg: Config, width: int, height: int) -> float:
                      cfg.screen_fraction_w, cfg.screen_fraction_h)
 
 
+def save_heatmap_image(heat: HeatmapAccumulator, path: str) -> bool:
+    """Writes the JET-colorized accumulator to an image file.
+
+    Args:
+        heat: Accumulator holding the heat to export.
+        path: Destination image path (the extension selects the format).
+
+    Returns:
+        ``True`` if the file was written, ``False`` otherwise (the error is
+        logged; a failed export does not abort the run).
+    """
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    try:
+        written = cv2.imwrite(path, heat.colorized())
+    except cv2.error as exc:  # e.g. unsupported or missing file extension.
+        logger.error("Could not write heatmap image %s: %s", path, exc)
+        return False
+    if written:
+        logger.info("Saved final heatmap to %s", path)
+    else:
+        logger.error("Could not write heatmap image: %s", path)
+    return written
+
+
 def process_video(input_path: str, output_path: str, cfg: Config) -> int:
     """Runs tracking and heatmap rendering on a video and writes the result.
 
@@ -74,9 +99,11 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
         Number of frames written.
 
     Raises:
-        ValueError: If the input video cannot be opened.
+        ValueError: If the input video cannot be opened, or an output path
+            equals the input video.
         RuntimeError: If the output writer cannot be opened.
     """
+    check_distinct_paths(input_path, output_path, cfg.save_heatmap)
     from ultralytics import YOLO  # Heavy import kept local to the pipeline.
 
     cap = cv2.VideoCapture(input_path)
@@ -160,11 +187,8 @@ def process_video(input_path: str, output_path: str, cfg: Config) -> int:
             cv2.destroyAllWindows()
         logger.info("Saved %s (%d frames).", output_path, frames)
 
-    if cfg.save_heatmap and frames > 0:
-        heat_dir = os.path.dirname(os.path.abspath(cfg.save_heatmap))
-        os.makedirs(heat_dir, exist_ok=True)
-        if cv2.imwrite(cfg.save_heatmap, heat.colorized()):
-            logger.info("Saved final heatmap to %s", cfg.save_heatmap)
-        else:
-            logger.error("Could not write heatmap image: %s", cfg.save_heatmap)
+    if frames == 0:
+        logger.warning("No frames were processed; %s holds no video.", output_path)
+    elif cfg.save_heatmap:
+        save_heatmap_image(heat, cfg.save_heatmap)
     return frames

@@ -28,10 +28,11 @@ def get_screen_resolution() -> Optional[Tuple[int, int]]:
         import tkinter as tk
 
         root = tk.Tk()
-        root.withdraw()
-        size = (root.winfo_screenwidth(), root.winfo_screenheight())
-        root.destroy()
-        return size
+        try:
+            root.withdraw()
+            return (root.winfo_screenwidth(), root.winfo_screenheight())
+        finally:
+            root.destroy()
     except Exception as exc:  # TclError when headless, ImportError without Tk.
         logger.warning("Could not read screen resolution: %s", exc)
         return None

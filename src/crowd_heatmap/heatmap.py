@@ -1,5 +1,6 @@
 """Decaying spatial heatmap accumulator (numpy + OpenCV)."""
 
+import math
 from typing import Iterable, Tuple
 
 import cv2
@@ -30,7 +31,9 @@ class HeatmapAccumulator:
         blur: Gaussian kernel size (odd, positive).
 
     Raises:
-        ValueError: If ``blur`` is not a positive odd integer.
+        ValueError: If the frame size is not positive, ``decay`` is outside
+            ``[0, 1]``, ``radius`` is negative, ``intensity`` is not finite, or
+            ``blur`` is not a positive odd integer.
     """
 
     def __init__(
@@ -43,6 +46,14 @@ class HeatmapAccumulator:
         blur: int = 35,
     ) -> None:
         """Allocates a zeroed accumulator and a reusable mask buffer."""
+        if width < 1 or height < 1:
+            raise ValueError("frame size must be positive")
+        if not 0.0 <= decay <= 1.0:
+            raise ValueError("decay must be in [0, 1]")
+        if radius < 0:
+            raise ValueError("radius must be >= 0")
+        if not math.isfinite(intensity):
+            raise ValueError("intensity must be finite")
         if blur < 1 or blur % 2 == 0:
             raise ValueError("blur kernel size must be a positive odd integer")
         self.decay = decay
