@@ -87,7 +87,9 @@ Example outputs produced by this project (re-encoded to H.264, 1920 px wide, 15 
 
 | File | Content |
 |---|---|
-| [`results/abbey_road_heatmap.mp4`](results/abbey_road_heatmap.mp4) | Pedestrian crossing: tracking (left) and accumulated heatmap with occupancy statistics (right). |
+| [`results/abbey_road_heatmap.mp4`](results/abbey_road_heatmap.mp4) | Pedestrian crossing at night: tracking (left) and accumulated heatmap with occupancy statistics (right). |
+| [`results/abbey_road_day_heatmap.mp4`](results/abbey_road_day_heatmap.mp4) | The same crossing by day, with more people. |
+| [`results/shinjuku_heatmap.mp4`](results/shinjuku_heatmap.mp4) | Dense scramble crossing in Tokyo (up to about 100 people on screen at once). |
 | [`results/street_2_heatmap.mp4`](results/street_2_heatmap.mp4) | Street scene: tracking and heatmap side by side. |
 | [`results/street_3_heatmap.mp4`](results/street_3_heatmap.mp4) | Street scene: tracking and heatmap side by side. |
 
@@ -162,7 +164,9 @@ crowd-heatmap-analytics/
     assets/demo.gif         # demo animation used above
   samples/
     README.md               # source of the sample clip
-    abbey_road_20s.mp4      # short input clip to try the tool
+    abbey_road_20s.mp4      # short input clips to try the tool
+    abbey_road_day_20s.mp4
+    shinjuku_20s.mp4
   weights/
     README.md
     yolo26m.pt              # lighter model (yolo26x.pt is auto-downloaded)
@@ -191,7 +195,7 @@ Tests use synthetic data only (no model, no video): `pip install pytest` and run
 
 ## Limitations
 
-- **"Total Unique People" counts tracker IDs, not people.** Every ID switch (occlusion, leaving and re-entering the frame, missed detections) creates a new ID and inflates the count. Treat it as an upper bound, not a head count.
+- **"Total Unique People" counts tracker IDs, not people.** Every ID switch (occlusion, leaving and re-entering the frame, missed detections) creates a new ID and inflates the count. Treat it as an upper bound, not a head count. In the dense Shinjuku example it reaches several hundred IDs in 20 s while at most about 100 people are on screen.
 - Current and peak occupancy count only tracked detections in the frame; missed or occluded people are not counted, and false positives (a low `--conf` of 0.10 raises their likelihood) are.
 - The heatmap is in image coordinates. There is no perspective correction, so people near the camera cover more pixels than distant ones, and the heat is not comparable across camera views.
 - Min-max normalization is per frame: colors are relative to the current maximum, not an absolute density scale, and one very busy spot can wash out the rest.
